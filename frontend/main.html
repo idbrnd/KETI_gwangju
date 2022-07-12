@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script src="common.js"></script>  
+    <script>
+      //실행
+      settingMainScreen();setInterval(function(){settingMainScreen();},(1*h()));
+
+      function settingMainScreen(){
+        const query = encodeURIComponent('select ID, khaiValue, location from public_data order by time desc limit 5')
+        const url = `http://${HOST}:${PORT}/query?db=${DB}&q=${query}`;
+        console.log(url);
+        fetch(url)
+        .then(response => response.json())
+        .then(parsedResponse => {
+          let values = parsedResponse.results[0].series[0].values;
+          
+          values.forEach((e,i)=>{
+
+            colorIndex= setCAIColorIndex(e[2]);
+            color = fillColor = COLORS[colorIndex];//COLORS 배열에서 colorIndex번째 선택
+            text = setWord(e[2]);
+            isBlink = (colorIndex !== 5);
+            console.log(isBlink);
+            window.frameElement._map.do.getUIE(e[1]).setStyle({text, color});//CAI 글자
+            window.frameElement._map.do.getUIE((e[1]+"_lamp1")).setStyle({fillColor, blink:isBlink});//글자 옆 lamp
+            window.frameElement._map.do.getUIE((e[1]+"_lamp2")).setStyle({fillColor});//지도 위 lamp
+          })
+        })
+        .catch((error) => console.log(error));
+      }
+    </script>
+</body>
+</html>

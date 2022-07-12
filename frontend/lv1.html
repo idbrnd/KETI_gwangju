@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script src="common.js"></script>
+    <script>
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const ID = urlParams.get('id');
+
+        //실행
+        settingLv1SensorData();setInterval(function(){settingLv1SensorData();},(5*s()));
+
+        function settingLv1SensorData(){
+            const query = encodeURIComponent('select * from public_data where ID = \''+ ID +'\' order by time desc limit 1')
+            const url = `http://${HOST}:${PORT}/query?db=${DB}&q=${query}`;
+            console.log(url);
+            
+            fetch(url)
+            .then(response => response.json())
+            .then(parsedResponse => {
+                values = parsedResponse.results[0].series[0].values[0];
+                columns = parsedResponse.results[0].series[0].columns;
+                itemArray = ["O_CO","O_PM10","O_PM2.5","O_온도","O_습도"]
+                
+                itemArray.forEach((e)=>{
+                    findIndex = columns.indexOf(e);
+                    value = values[findIndex];
+
+                    colorIndex = 0;//colorIndex 기본값 설정
+
+                    if(e === "O_CO")    colorIndex = setCOcolorIndex(value);
+                    if(e === "O_PM10")  colorIndex = setPM10colorIndex(value);
+                    if(e === "O_PM2.5") colorIndex = setPM25colorIndex(value);
+
+                    text = value == -1? "-":value;
+                    color = COLORS[colorIndex];
+                    window.frameElement._map.do.getUIE(e).setStyle({text,color});
+                })
+                
+                loc = values[columns.indexOf("location")];
+                console.log(loc)
+                setLevel1Lamp(loc);
+            })
+            .catch((error) => console.log(error));
+            
+        }
+        function setLevel1Lamp(loc){
+            const query = encodeURIComponent(`select * from air_sensor where location = '${loc}' order by time desc limit 2`);
+            const url = (`http://${HOST}:${PORT}/query?db=${DB}&q=`+query);
+
+            console.log(url);
+            fetch(url)
+            .then(response => response.json())
+            .then(parsedResponse => {
+                values = parsedResponse.results[0].series[0].values;
+                columns = parsedResponse.results[0].series[0].columns;
+
+                colorIndices = [];
+
+                columns.forEach((col)=>{
+                    values.forEach((val)=>{
+                        targetIndex = (columns.indexOf(col));
+                        v = val[targetIndex]
+                        if(col == "CO")     colorIndices.push(setCOcolorIndex(v));
+                        if(col == "CO2")    colorIndices.push(setCO2colorIndex(v));
+                        if(col == "HCHO")   colorIndices.push(setHCHOcolorIndex(v));
+                        if(col == "PM10")   colorIndices.push(setPM10colorIndex(v));
+                        if(col == "PM2.5")  colorIndices.push(setPM25colorIndex(v));
+                        if(col == "VOCs")   colorIndices.push(setVOCscolorIndex(v));
+                    })
+                })
+
+                maxIndex = Math.max(...colorIndices);
+                fillColor = COLORS[maxIndex];
+                blink = (maxIndex === 3 || maxIndex === 4) 
+                window.frameElement._map.do.getUIE(ID).setStyle({fillColor, blink});
+
+            })
+            .catch((error) => console.log(error));
+        }
+    </script>
+</body>
+</html>
