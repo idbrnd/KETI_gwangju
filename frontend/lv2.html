@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+</head>
+<body>
+    <script src="common.js"></script>
+    <script>
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const ID = urlParams.get('id');
+        const INDEX = Number(urlParams.get('index'));
+
+        settingLv2PublicAPI();
+        setInterval(function(){
+            settingLv2PublicAPI();
+        },5*s());
+
+        function settingLv2PublicAPI(){
+            //외부환경(공공API)값 세팅
+            const query = encodeURIComponent('select * from public_data where ID = \''+ ID +'\' order by time desc limit 1')
+            const url = `http://${HOST}:${PORT}/query?db=${DB}&q=${query}`;
+            console.log(url);
+            fetch(url)
+            .then(response => response.json())
+            .then(parsedResponse => {
+
+                values = parsedResponse.results[0].series[0].values[0];
+                columns = parsedResponse.results[0].series[0].columns;
+                elements = ["O_CO","O_PM10","O_PM2.5","O_온도","O_습도"]
+
+                elements.forEach((e)=>{
+                    index = columns.indexOf(e);
+                    text = values[index];
+                    colorIndex = 0;
+                    if(e === "O_CO")    colorIndex = setCOcolorIndex(text);
+                    if(e === "O_PM10")  colorIndex = setPM10colorIndex(text);
+                    if(e === "O_PM2.5") colorIndex = setPM25colorIndex(text);
+                    
+                    
+                    color = COLORS[colorIndex];
+                    window.frameElement._map.do.getUIE(e).setStyle({text, color});
+                })
+
+                loc = values[columns.indexOf("location")];
+                setLevel2SensorDatabyLocation(loc)
+            })
+            .catch((error) => console.log(error));
+        }
+        
+        function setLevel2SensorDatabyLocation(loc){
+            const query = encodeURIComponent(`select * from air_sensor where location = '${loc}' order by time desc limit 2`);
+            const url = (`http://${HOST}:${PORT}/query?db=${DB}&q=`+query);
+
+            console.log(url);
+            fetch(url)
+            .then(response => response.json())
+            .then(parsedResponse => {
+                colorArr = [];
+
+                columns = parsedResponse.results[0].series[0].columns;
+                values = parsedResponse.results[0].series[0].values;
+
+                idIndex = columns.indexOf("id");//columns 내 "id"의 index 찾아서
+                values.sort((a,b)=>(Number(a[idIndex]) - Number(b[idIndex]))); // id 기준으로 오름차순정렬
+
+                values.forEach((element,index)=>{
+                    array = [];
+                    columns.forEach((col,i)=>{
+                        colorIndex = 0;
+                        value = element[columns.indexOf(col)] 
+                        if(col == "CO"){
+                            colorIndex = setCOcolorIndex(value);
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            }); 
+                            return;
+                        }
+                        if(col == "CO2"){
+                            colorIndex = setCO2colorIndex(value);
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            });  
+                            return;
+                        }
+                        if(col == "HCHO"){
+                            colorIndex = setHCHOcolorIndex(value);
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            }); 
+                            return;
+                        }
+                        if(col == "PM10"){
+                            colorIndex = setPM10colorIndex(value)
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            });  
+                            return;
+                        }
+                        if(col == "PM2.5"){
+                            colorIndex = setPM25colorIndex(value)
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            });  
+                            return;
+                        }
+                        if(col == "VOCs"){
+                            colorIndex = setVOCscolorIndex(value)
+                            array.push({
+                                item:col,
+                                value,
+                                colorIndex
+                            });  
+                            return;
+                        }
+
+                        array.push({
+                            item:col,
+                            value,
+                            colorIndex
+                        });                          
+                        
+                    })
+                    colorArr.push(array);
+                })
+
+                setLamps(colorArr);
+
+                setTextValuesbyArray(colorArr[INDEX]);
+            })
+            .catch((error) => console.log(error));
+        }
+
+        function setLamps(colorArr){
+            colorArr.forEach((element,index)=>{
+                colorIndices = element.map((e)=>e.colorIndex);
+                maxIndex = Math.max(...colorIndices);
+                id = element.filter((e)=>(e.item === 'id'))[0].value
+                fillColor = COLORS[maxIndex];
+                window.frameElement._map.do.getUIE(id).setStyle({fillColor});
+            })
+        }
+
+        function setTextValuesbyArray(arr){
+            arr.forEach((element,index)=>{
+                if(!window.frameElement._map.do.getUIE(element.item)) return;
+                text = element.value;
+                color = COLORS[element.colorIndex];
+                window.frameElement._map.do.getUIE(element.item).setStyle({text, color});
+            })
+        }
+        
+
+    </script>
+</body>
+</html>
